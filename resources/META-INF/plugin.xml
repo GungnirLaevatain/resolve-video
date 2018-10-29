@@ -1,0 +1,41 @@
+
+<idea-plugin>
+    <id>com.github.gungnirlaevataion.resolveVideo</id>
+    <name>Resolve Video</name>
+    <version>1.0</version>
+    <vendor email="gungnirlaevatain@outlook.com" url="http://www.baidu.com">gungnirlaevatain</vendor>
+
+    <description><![CDATA[
+      Set the editor background to a random picture from a folder.<br>
+    ]]></description>
+
+    <change-notes><![CDATA[
+      Added settings page xxx xx xx xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ]]>
+    </change-notes>
+
+    <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
+    <idea-version since-build="173.0"/>
+
+    <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html
+         on how to target different products -->
+    <!-- uncomment to enable plugin in all products
+    <depends>com.intellij.modules.lang</depends>
+    -->
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationConfigurable groupId="appearance" groupWeight="20" id="resolve.video"
+                                 displayName="Resolve Video" instance="ui.Setting"/>
+    </extensions>
+
+    <actions>
+        <group id="resolveVideo" text="Resolve Video" description="Resolve Video">
+            <add-to-group group-id="ViewMenu" anchor="before" relative-to-action="ToggleFullScreenGroup"/>
+            <separator/>
+            <action id="startResolveVideo" class="action.StartAction" text="Resolve Video start"/>
+            <action id="restartResolveVideo" class="action.RestartAction" text="Resolve Video restart"/>
+            <action id="stopResolveVideo" class="action.StopAction" text="Resolve Video stop"/>
+        </group>
+    </actions>
+
+</idea-plugin>
