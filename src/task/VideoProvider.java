@@ -1,10 +1,8 @@
 package task;
 
-import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
-import com.intellij.openapi.wm.impl.IdeBackgroundUtil;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.Java2DFrameConverter;
@@ -16,6 +14,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The class Video provider.
@@ -29,10 +28,17 @@ public class VideoProvider implements Runnable {
     private String videoPath;
     private String cachePath;
     private volatile boolean stop;
+    private FFmpegFrameGrabber videoCapture;
 
-    public VideoProvider(String videoPath, String cachePath) {
+    public VideoProvider(String videoPath, String cachePath) throws IOException {
         this.videoPath = videoPath;
         this.cachePath = cachePath;
+        File cacheDirectory = new File(cachePath);
+        if (!cacheDirectory.exists()) {
+            Files.createDirectory(cacheDirectory.toPath());
+        }
+        videoCapture = new FFmpegFrameGrabber(videoPath);
+        videoCapture.start();
     }
 
     /**
@@ -49,12 +55,9 @@ public class VideoProvider implements Runnable {
     @Override
     public void run() {
         try {
-            File cacheDirectory = new File(cachePath);
-            if (!cacheDirectory.exists()) {
-                Files.createDirectory(cacheDirectory.toPath());
-            }
-            while (!stop) {
-                checkCache();
+            checkCache();
+            if (stop && videoCapture != null) {
+                videoCapture.close();
             }
         } catch (IOException | InterruptedException e) {
             Notifications.Bus.notify(new Notification("extras", "Notice",
@@ -63,28 +66,24 @@ public class VideoProvider implements Runnable {
     }
 
     private void checkCache() throws IOException, InterruptedException {
-        try (FFmpegFrameGrabber videoCapture = new FFmpegFrameGrabber(videoPath)) {
-            videoCapture.start();
-            int maxVideoFrames = videoCapture.getLengthInVideoFrames();
-            for (int i = 0; i < maxVideoFrames && !stop; i++) {
+        System.out.println("start queque   " + System.currentTimeMillis());
+        int maxVideoFrames = videoCapture.getLengthInVideoFrames();
+        for (int i = 0; i < maxVideoFrames && !stop; ) {
+            Path tempPath = Paths.get(cachePath, i + ".jpg");
+            if (!tempPath.toFile().exists()) {
+                videoCapture.setVideoFrameNumber(i);
                 Frame frame = videoCapture.grabImage();
-                Path tempPath = Paths.get(cachePath, i + ".jpg");
-                if (!tempPath.toFile().exists() && frame != null) {
+                if (frame != null) {
                     Java2DFrameConverter java2DFrameConverter = new Java2DFrameConverter();
                     BufferedImage bufferedImage = java2DFrameConverter.getBufferedImage(frame);
                     ImageIO.write(bufferedImage, "jpg", tempPath.toFile());
                 }
-                showImage(tempPath.toString());
             }
+            if (!CacheQueue.blockingQueue.offer(tempPath.toString(), 100L, TimeUnit.MILLISECONDS)) {
+                continue;
+            }
+            i++;
         }
-    }
-
-    private void showImage(String path) throws InterruptedException {
-        PropertiesComponent prop = PropertiesComponent.getInstance();
-        prop.setValue(IdeBackgroundUtil.FRAME_PROP, null);
-        prop.setValue(IdeBackgroundUtil.EDITOR_PROP, path);
-        Thread.sleep(40);
-
     }
 
 

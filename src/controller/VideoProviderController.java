@@ -2,12 +2,13 @@ package controller;
 
 import com.intellij.ide.util.PropertiesComponent;
 import org.apache.commons.io.FileUtils;
+import task.CacheQueue;
+import task.VideoConsumer;
 import task.VideoProvider;
 import ui.Setting;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -20,7 +21,8 @@ import java.util.concurrent.TimeUnit;
  * @since JDK 1.8
  */
 public class VideoProviderController {
-    private static ExecutorService service;
+    private static ScheduledExecutorService service;
+    private static ScheduledExecutorService consumerService;
     private static VideoProvider videoProvider;
 
     public static void start() {
@@ -36,13 +38,25 @@ public class VideoProviderController {
         if (service != null) {
             stop();
         }
-        service = Executors.newSingleThreadExecutor();
-        videoProvider = new VideoProvider(filePath, cachePath);
-        service.execute(videoProvider);
+        service = Executors.newSingleThreadScheduledExecutor();
+        consumerService = Executors.newSingleThreadScheduledExecutor();
+        try {
+            videoProvider = new VideoProvider(filePath, cachePath);
+            service.scheduleWithFixedDelay(videoProvider, 40L, 3000L, TimeUnit.MILLISECONDS);
+        } catch (IOException ignored) {
+        }
+        VideoConsumer videoConsumer = new VideoConsumer();
+        consumerService.scheduleWithFixedDelay(videoConsumer, 40L, 40L, TimeUnit.MILLISECONDS);
 
     }
 
     public static void stop() {
+        stopProvider();
+        stopConsuemr();
+        CacheQueue.blockingQueue.clear();
+    }
+
+    private static void stopProvider() {
 
         if (videoProvider != null) {
             videoProvider.setStop(true);
@@ -51,6 +65,13 @@ public class VideoProviderController {
             service.shutdownNow();
         }
         service = null;
+    }
+
+    private static void stopConsuemr() {
+        if (consumerService != null && !consumerService.isTerminated()) {
+            consumerService.shutdownNow();
+        }
+        consumerService = null;
     }
 
     public static void restart() {
